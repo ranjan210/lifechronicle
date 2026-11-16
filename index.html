@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>LifeChronicle – Achievement & Progress Catalog</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
+
+<!-- Tailwind CSS v4 (in-browser build) -->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.11"></script>
+<!-- React 18 + Babel (compiles the JSX in this file in the browser) -->
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.0/babel.min.js"></script>
+<!-- Lucide icons (vanilla build; wrapped into React components below) -->
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+
+<style>
+  @keyframes toast-in { from { opacity: 0; transform: translateY(1rem); } to { opacity: 1; transform: none; } }
+  .animate-in { animation: toast-in .25s ease-out both; }
+</style>
+</head>
+<body>
+<div id="root"><p style="font-family:sans-serif;padding:2rem;color:#64748b">Loading LifeChronicle…</p></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef } = React;
+
+// ---- Lucide icon -> React component adapter ----
+function makeIcon(name) {
+  return function Icon({ className = '' }) {
+    const lib = window.lucide && window.lucide.icons;
+    let node = lib && lib[name];
+    if (!node) return <svg className={className} viewBox="0 0 24 24" />;
+    if (node[0] === 'svg') node = node[2]; // older lucide format: ['svg', attrs, children]
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        className={className}>
+        {node.map(([tag, attrs], i) => React.createElement(tag, { ...attrs, key: i }))}
+      </svg>
+    );
+  };
+}
+const CalendarIcon = makeIcon('Calendar');
+const ChevronLeft = makeIcon('ChevronLeft');
+const ChevronRight = makeIcon('ChevronRight');
+const Plus = makeIcon('Plus');
+const Trophy = makeIcon('Trophy');
+const Star = makeIcon('Star');
+const CheckCircle2 = makeIcon('CheckCircle2');
+const FileText = makeIcon('FileText');
+const Filter = makeIcon('Filter');
+const Sparkles = makeIcon('Sparkles');
+const Layers = makeIcon('Layers');
+const Clock = makeIcon('Clock');
+const Tag = makeIcon('Tag');
+const Trash2 = makeIcon('Trash2');
+const Edit3 = makeIcon('Edit3');
+const X = makeIcon('X');
+const Search = makeIcon('Search');
+const RotateCcw = makeIcon('RotateCcw');
+const Award = makeIcon('Award');
+const TrendingUp = makeIcon('TrendingUp');
+const Briefcase = makeIcon('Briefcase');
+const Code = makeIcon('Code');
+const Dumbbell = makeIcon('Dumbbell');
+const Heart = makeIcon('Heart');
+const BookOpen = makeIcon('BookOpen');
+const Download = makeIcon('Download');
+const Upload = makeIcon('Upload');
+const Database = makeIcon('Database');
+const Check = makeIcon('Check');
+const AlertCircle = makeIcon('AlertCircle');
+
+
+// ==========================================
+// CONSTANTS & CONFIGURATION
+// ==========================================
+
+const IMPORTANCE_LEVELS = {
+  4: {
+    level: 4,
+    label: 'Milestone / Major Win',
+    shortLabel: 'Milestone',
+    description: 'Life-changing events, major launches, PRs, or big completions',
+    bg: 'bg-amber-50 dark:bg-amber-950/50',
+    border: 'border-amber-300 dark:border-amber-700',
+    leftBorder: 'border-l-4 border-l-amber-500',
+    text: 'text-amber-900 dark:text-amber-200',
+    badge: 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-sm',
+    dot: 'bg-amber-500',
+    ring: 'ring-amber-500',
+    icon: Trophy
+  },
+  3: {
+    level: 3,
+    label: 'High / Key Progress',
+    shortLabel: 'Key Progress',
+    description: 'Significant breakthroughs, key milestones, or strong momentum',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/50',
+    border: 'border-emerald-300 dark:border-emerald-700',
+    leftBorder: 'border-l-4 border-l-emerald-500',
+    text: 'text-emerald-900 dark:text-emerald-200',
+    badge: 'bg-emerald-600 text-white shadow-sm',
+    dot: 'bg-emerald-500',
+    ring: 'ring-emerald-500',
+    icon: Star
+  },
+  2: {
+    level: 2,
+    label: 'Medium / Solid Step',
+    shortLabel: 'Solid Step',
+    description: 'Consistent progress, completed tasks, or good workouts',
+    bg: 'bg-blue-50 dark:bg-blue-950/50',
+    border: 'border-blue-200 dark:border-blue-800',
+    leftBorder: 'border-l-4 border-l-blue-500',
+    text: 'text-blue-900 dark:text-blue-200',
+    badge: 'bg-blue-600 text-white',
+    dot: 'bg-blue-500',
+    ring: 'ring-blue-500',
+    icon: CheckCircle2
+  },
+  1: {
+    level: 1,
+    label: 'Low / Daily Log',
+    shortLabel: 'Daily Log',
+    description: 'Routine habits, small notes, maintenance, or daily check-ins',
+    bg: 'bg-slate-100 dark:bg-slate-800/70',
+    border: 'border-slate-200 dark:border-slate-700',
+    leftBorder: 'border-l-4 border-l-slate-400',
+    text: 'text-slate-700 dark:text-slate-300',
+    badge: 'bg-slate-600 text-white',
+    dot: 'bg-slate-400',
+    ring: 'ring-slate-400',
+    icon: FileText
+  }
+};
+
+
+// Reference "Today" date matching November 16, 2026
+const DEFAULT_TODAY_STR = formatDateStr(new Date())
+
+const INITIAL_SAMPLE_ENTRIES = [];
+
+// ==========================================
+// DATE UTILITY FUNCTIONS
+// ==========================================
+
+function parseDateStr(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function formatDateStr(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function addDays(dateStr, days) {
+  const d = parseDateStr(dateStr);
+  d.setDate(d.getDate() + days);
+  return formatDateStr(d);
+}
+
+function addMonths(dateStr, months) {
+  const d = parseDateStr(dateStr);
+  const originalDay = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  if (d.getDate() !== originalDay) {
+    d.setDate(0);
+  }
+  return formatDateStr(d);
+}
+
+function getStartOfWeek(dateStr) {
+  const d = parseDateStr(dateStr);
+  const day = d.getDay(); // 0 = Sun, 1 = Mon, ...
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday start
+  const start = new Date(d.setDate(diff));
+  return formatDateStr(start);
+}
+
+function getWeekDays(dateStr) {
+  const startStr = getStartOfWeek(dateStr);
+  return Array.from({ length: 7 }, (_, i) => addDays(startStr, i));
+}
+
+function getMonthGridDays(dateStr) {
+  const d = parseDateStr(dateStr);
+  const year = d.getFullYear();
+  const month = d.getMonth();
+
+  const firstDayOfMonth = new Date(year, month, 1);
+  const lastDayOfMonth = new Date(year, month + 1, 0);
+
+  // Monday-based week index (0 = Mon, 6 = Sun)
+  const startOffset = (firstDayOfMonth.getDay() + 6) % 7;
+  const totalDaysInMonth = lastDayOfMonth.getDate();
+
+  const days = [];
+
+  // Previous month padding
+  for (let i = startOffset - 1; i >= 0; i--) {
+    const prevDate = new Date(year, month, -i);
+    days.push({
+      dateStr: formatDateStr(prevDate),
+      dayNumber: prevDate.getDate(),
+      isCurrentMonth: false
+    });
+  }
+
+  // Current month days
+  for (let i = 1; i <= totalDaysInMonth; i++) {
+    const currDate = new Date(year, month, i);
+    days.push({
+      dateStr: formatDateStr(currDate),
+      dayNumber: i,
+      isCurrentMonth: true
+    });
+  }
+
+  // Next month padding to fill 35 or 42 cells
+  const totalCells = days.length > 35 ? 42 : 35;
+  const remaining = totalCells - days.length;
+  for (let i = 1; i <= remaining; i++) {
+    const nextDate = new Date(year, month + 1, i);
+    days.push({
+      dateStr: formatDateStr(nextDate),
+      dayNumber: i,
+      isCurrentMonth: false
+    });
+  }
+
+  return days;
+}
+
+function formatReadableDate(dateStr, options = { month: 'short', day: 'numeric', year: 'numeric' }) {
+  const d = parseDateStr(dateStr);
+  return d.toLocaleDateString('en-US', options);
+}
+
+// ==========================================
+// MAIN COMPONENT
+// ==========================================
+
+function App() {
+  // State: Entries persisted in localStorage
+  const [entries, setEntries] = useState(() => {
+    try {
+      const saved = localStorage.getItem('life_catalog_entries_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to read from localStorage:', e);
+    }
+    return INITIAL_SAMPLE_ENTRIES;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('life_catalog_entries_v1', JSON.stringify(entries));
+    } catch (e) {
+      console.error('Failed to save to localStorage:', e);
+    }
+  }, [entries]);
+
+  // Navigation & View State
+  const [viewMode, setViewMode] = useState('month'); // 'month' | 'week' | 'day'
+  const [selectedDate, setSelectedDate] = useState(DEFAULT_TODAY_STR);
+
+  // Filter Mode State: 'notable' (Levels 3 & 4) vs 'detailed' (All Levels 1-4)
+  const [filterMode, setFilterMode] = useState('detailed'); // 'detailed' | 'notable'
+  const [notableThreshold, setNotableThreshold] = useState(3); // Default 3+ (Levels 3 & 4)
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Modal State for Add / Edit / View
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [viewingEntry, setViewingEntry] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+
+  // Data Backup (Export / Import) Modal & Toast State
+  const [isDataModalOpen, setIsDataModalOpen] = useState(false);
+  const [importStrategy, setImportStrategy] = useState('merge'); // 'merge' | 'replace'
+  const [dataFeedback, setDataFeedback] = useState(null); // { type: 'success' | 'error', message: string }
+  const [toastNotification, setToastNotification] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const showToast = (message, type = 'success') => {
+    setToastNotification({ message, type });
+    setTimeout(() => {
+      setToastNotification(prev => (prev?.message === message ? null : prev));
+    }, 4000);
+  };
+
+  // Form State inside Modal
+  const [formData, setFormData] = useState({
+    title: '',
+    date: DEFAULT_TODAY_STR,
+    time: '12:00',
+    importance: 3,
+    notes: ''
+  });
+
+  // ==========================================
+  // NAVIGATION HANDLERS
+  // ==========================================
+
+  const handlePrev = () => {
+    if (viewMode === 'month') {
+      setSelectedDate(prev => addMonths(prev, -1));
+    } else if (viewMode === 'week') {
+      setSelectedDate(prev => addDays(prev, -7));
+    } else {
+      setSelectedDate(prev => addDays(prev, -1));
+    }
+  };
+
+  const handleNext = () => {
+    if (viewMode === 'month') {
+      setSelectedDate(prev => addMonths(prev, 1));
+    } else if (viewMode === 'week') {
+      setSelectedDate(prev => addDays(prev, 7));
+    } else {
+      setSelectedDate(prev => addDays(prev, 1));
+    }
+  };
+
+  const handleToday = () => {
+    setSelectedDate(DEFAULT_TODAY_STR);
+  };
+
+  // ==========================================
+  // JSON EXPORT & IMPORT HANDLERS
+  // ==========================================
+
+  const handleExportJSON = () => {
+    try {
+      const exportPayload = {
+        app: 'LifeChronicle',
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        entryCount: entries.length,
+        entries
+      };
+
+      const jsonString = JSON.stringify(exportPayload, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      const todayFileDate = formatDateStr(new Date());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `life-chronicle-backup-${todayFileDate}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setDataFeedback({
+        type: 'success',
+        message: `Successfully exported ${entries.length} entries to life-chronicle-backup-${todayFileDate}.json`
+      });
+      showToast(`Exported ${entries.length} achievements to JSON`);
+    } catch (err) {
+      console.error('Export failed:', err);
+      setDataFeedback({
+        type: 'error',
+        message: 'Failed to export JSON file. Please try again.'
+      });
+    }
+  };
+
+  const validateAndNormalizeEntries = (rawList) => {
+    if (!Array.isArray(rawList)) return null;
+    const validEntries = [];
+
+    for (let i = 0; i < rawList.length; i++) {
+      const item = rawList[i];
+      if (!item || typeof item !== 'object') continue;
+      if (typeof item.title !== 'string' || !item.title.trim()) continue;
+      if (typeof item.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)) continue;
+
+      const imp = Number(item.importance);
+      const normalizedImportance = [1, 2, 3, 4].includes(imp) ? imp : 2;
+
+      validEntries.push({
+        id: item.id ? String(item.id) : `imported-${Date.now()}-${i}`,
+        title: item.title.trim(),
+        date: item.date,
+        time: typeof item.time === 'string' ? item.time : '12:00',
+        importance: normalizedImportance,
+        notes: typeof item.notes === 'string' ? item.notes : ''
+      });
+    }
+
+    return validEntries;
+  };
+
+  const handleImportFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target.result);
+        // Support both wrapped backup format ({ entries: [...] }) and raw array format ([...])
+        const rawEntries = Array.isArray(parsed)
+          ? parsed
+          : Array.isArray(parsed?.entries)
+          ? parsed.entries
+          : null;
+
+        if (!rawEntries) {
+          setDataFeedback({
+            type: 'error',
+            message: 'Invalid backup format: JSON must contain an "entries" array or be an array of achievement objects.'
+          });
+          return;
+        }
+
+        const validated = validateAndNormalizeEntries(rawEntries);
+        if (!validated || validated.length === 0) {
+          setDataFeedback({
+            type: 'error',
+            message: 'No valid entries found in file. Each entry requires at least a "title" and a "YYYY-MM-DD" "date".'
+          });
+          return;
+        }
+
+        if (importStrategy === 'replace') {
+          setEntries(validated);
+          setDataFeedback({
+            type: 'success',
+            message: `Replaced catalog with ${validated.length} imported entries from "${file.name}".`
+          });
+          showToast(`Imported & replaced ${validated.length} entries!`);
+        } else {
+          // Merge by ID (update matching IDs, append new ones)
+          setEntries(prev => {
+            const map = new Map(prev.map(item => [item.id, item]));
+            let updatedCount = 0;
+            let addedCount = 0;
+
+            validated.forEach(item => {
+              if (map.has(item.id)) {
+                updatedCount++;
+              } else {
+                addedCount++;
+              }
+              map.set(item.id, item);
+            });
+
+            const merged = Array.from(map.values());
+            setDataFeedback({
+              type: 'success',
+              message: `Merged "${file.name}": ${addedCount} new added, ${updatedCount} existing updated (${merged.length} total).`
+            });
+            showToast(`Merged ${validated.length} entries (${addedCount} new, ${updatedCount} updated)`);
+            return merged;
+          });
+        }
+      } catch (err) {
+        console.error('Failed to parse JSON:', err);
+        setDataFeedback({
+          type: 'error',
+          message: 'Could not parse JSON file. Please verify the file is valid JSON.'
+        });
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
+  // ==========================================
+  // CRUD HANDLERS
+  // ==========================================
+
+  const openNewEntryModal = (dateStr = selectedDate, defaultImportance = 3) => {
+    setEditingEntry(null);
+    setFormData({
+      title: '',
+      date: dateStr,
+      time: '12:00',
+      importance: defaultImportance,
+      notes: ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEditEntryModal = (entry) => {
+    setViewingEntry(null);
+    setEditingEntry(entry);
+    setFormData({
+      title: entry.title,
+      date: entry.date,
+      time: entry.time || '',
+      importance: entry.importance || 2,
+      notes: entry.notes || ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSaveEntry = (e) => {
+    e.preventDefault();
+    if (!formData.title.trim()) return;
+
+    if (editingEntry) {
+      setEntries(prev =>
+        prev.map(item =>
+          item.id === editingEntry.id
+            ? { ...item, ...formData, title: formData.title.trim() }
+            : item
+        )
+      );
+    } else {
+      const newEntry = {
+        id: `entry-${Date.now()}`,
+        ...formData,
+        title: formData.title.trim()
+      };
+      setEntries(prev => [...prev, newEntry]);
+    }
+    setIsModalOpen(false);
+    setEditingEntry(null);
+  };
+
+  const handleDeleteEntry = (id) => {
+    setEntries(prev => prev.filter(item => item.id !== id));
+    setDeleteConfirmId(null);
+    if (viewingEntry && viewingEntry.id === id) {
+      setViewingEntry(null);
+    }
+  };
+
+  // ==========================================
+  // FILTERED ENTRIES & PERIOD STATS
+  // ==========================================
+
+  // Filter entries according to Notable vs Detailed mode, category, and search query
+  const filteredEntries = useMemo(() => {
+    return entries
+      .filter(entry => {
+        if (filterMode === 'notable' && entry.importance < notableThreshold) {
+          return false;
+        }
+
+        if (searchQuery.trim() !== '') {
+          const q = searchQuery.toLowerCase();
+          const matchTitle = entry.title.toLowerCase().includes(q);
+          const matchNotes = (entry.notes || '').toLowerCase().includes(q);
+          if (!matchTitle && !matchNotes) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        // Sort by importance descending first, then by time
+        if (b.importance !== a.importance) return b.importance - a.importance;
+        return (a.time || '').localeCompare(b.time || '');
+      });
+  }, [entries, filterMode, notableThreshold, searchQuery]);
+
+  // Group filtered entries by date string for fast lookup
+  const entriesByDate = useMemo(() => {
+    const map = {};
+    filteredEntries.forEach(entry => {
+      if (!map[entry.date]) map[entry.date] = [];
+      map[entry.date].push(entry);
+    });
+    return map;
+  }, [filteredEntries]);
+
+  // All entries (unfiltered by Notable toggle) for current period stats comparison
+  const periodStats = useMemo(() => {
+    let periodStart = selectedDate;
+    let periodEnd = selectedDate;
+    let periodLabel = '';
+
+    if (viewMode === 'month') {
+      const d = parseDateStr(selectedDate);
+      const first = new Date(d.getFullYear(), d.getMonth(), 1);
+      const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      periodStart = formatDateStr(first);
+      periodEnd = formatDateStr(last);
+      periodLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    } else if (viewMode === 'week') {
+      const weekDays = getWeekDays(selectedDate);
+      periodStart = weekDays[0];
+      periodEnd = weekDays[6];
+      periodLabel = `${formatReadableDate(periodStart, { month: 'short', day: 'numeric' })} – ${formatReadableDate(periodEnd, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    } else {
+      periodLabel = formatReadableDate(selectedDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
+    const inPeriod = entries.filter(e => e.date >= periodStart && e.date <= periodEnd);
+    const milestones = inPeriod.filter(e => e.importance === 4).length;
+    const keyProgress = inPeriod.filter(e => e.importance === 3).length;
+    const notableCount = inPeriod.filter(e => e.importance >= notableThreshold).length;
+    const hiddenByFilter = filterMode === 'notable' ? inPeriod.length - notableCount : 0;
+
+    return {
+      periodLabel,
+      total: inPeriod.length,
+      notableCount,
+      milestones,
+      keyProgress,
+      hiddenByFilter,
+      inPeriodEntries: inPeriod.sort((a, b) => b.importance - a.importance || b.date.localeCompare(a.date))
+    };
+  }, [entries, selectedDate, viewMode, filterMode, notableThreshold]);
+
+  // Helper to render category badge
+  const getCategoryBadge = (catId) => {
+    const cat = CATEGORIES.find(c => c.id === catId) || CATEGORIES[4];
+    const IconComp = cat.icon;
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${cat.color}`}>
+        <IconComp className="w-3 h-3" />
+        {cat.label}
+      </span>
+    );
+  };
+
+  // ==========================================
+  // RENDER
+  // ==========================================
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-white">
+      {/* ========================================== */}
+      {/* TOP HEADER BAR                             */}
+      {/* ========================================== */}
+      <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            {/* Brand Title & Subtitle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20">
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                      LifeChronicle
+                    </h1>
+                    <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800">
+                      Achievement & Progress Catalog
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Track milestones, daily progress, and memorable wins so you never forget how far you’ve come.
+                  </p>
+                </div>
+              </div>
+
+              {/* Mobile "+ Log" & Backup buttons */}
+              <div className="flex items-center gap-2 lg:hidden">
+                <button
+                  onClick={() => {
+                    setDataFeedback(null);
+                    setIsDataModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
+                  title="Backup & Restore Data (JSON)"
+                >
+                  <Database className="w-4 h-4 text-amber-500" />
+                  <span>Backup</span>
+                </button>
+                <button
+                  onClick={() => openNewEntryModal(selectedDate)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 dark:bg-amber-500 text-white dark:text-slate-950 font-semibold text-xs shadow-sm hover:opacity-90 transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Log Win</span>
+                </button>
+              </div>
+            </div>
+
+            {/* PROMINENT VIEW FILTER MODE SWITCH ("Notable Achievements" vs "Detailed View") */}
+            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3">
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                <button
+                  onClick={() => setFilterMode('detailed')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                    filterMode === 'detailed'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs ring-1 ring-slate-200 dark:ring-slate-700'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Layers className="w-4 h-4 text-blue-500" />
+                  <span>Detailed View</span>
+                  <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                    All
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setFilterMode('notable')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                    filterMode === 'notable'
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Sparkles className={`w-4 h-4 ${filterMode === 'notable' ? 'text-white' : 'text-amber-500'}`} />
+                  <span>Notable Achievements</span>
+                  <span
+                    className={`px-1.5 py-0.5 text-[10px] rounded-full ${
+                      filterMode === 'notable'
+                        ? 'bg-white/25 text-white font-bold'
+                        : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                    }`}
+                  >
+                    Lvl {notableThreshold}+
+                  </span>
+                </button>
+              </div>
+
+              {/* Desktop Data / Backup Button */}
+              <button
+                onClick={() => {
+                  setDataFeedback(null);
+                  setIsDataModalOpen(true);
+                }}
+                className="hidden lg:inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm shadow-2xs transition cursor-pointer"
+                title="Export or Import JSON Backup"
+              >
+                <Database className="w-4 h-4 text-amber-500" />
+                <span>Data / Backup</span>
+              </button>
+
+              {/* Desktop "+ Log Achievement" Primary CTA */}
+              <button
+                onClick={() => openNewEntryModal(selectedDate)}
+                className="hidden lg:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-400 text-white dark:text-slate-950 font-semibold text-sm shadow-sm transition cursor-pointer"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span>Log Achievement</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Floating Toast Notification */}
+      {toastNotification && (
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-900 dark:bg-slate-800 text-white text-xs sm:text-sm font-medium shadow-xl border border-slate-700 animate-in fade-in slide-in-from-bottom-4">
+          {toastNotification.type === 'error' ? (
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          ) : (
+            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          )}
+          <span>{toastNotification.message}</span>
+          <button
+            onClick={() => setToastNotification(null)}
+            className="ml-1 text-slate-400 hover:text-white"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* ========================================== */}
+      {/* SUBTLE SUMMARY / STATS & LEGEND BAR        */}
+      {/* ========================================== */}
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            {/* Period Metrics */}
+            <div className="flex flex-wrap items-center gap-3 sm:gap-6">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  {viewMode} Summary:
+                </span>
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  {periodStats.total} Total Logged
+                </span>
+              </div>
+
+              <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block" />
+
+              <div className="flex items-center gap-4 text-xs sm:text-sm">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
+                  <span className="font-semibold text-amber-700 dark:text-amber-400">
+                    {periodStats.milestones} Milestones
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                    {periodStats.keyProgress} Key Progress
+                  </span>
+                </div>
+              </div>
+
+              {filterMode === 'notable' && (
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span>
+                    Highlighting <strong>{periodStats.notableCount}</strong> major wins
+                    {periodStats.hiddenByFilter > 0 && ` (${periodStats.hiddenByFilter} smaller logs hidden)`}
+                  </span>
+                  <select
+                    value={notableThreshold}
+                    onChange={(e) => setNotableThreshold(Number(e.target.value))}
+                    className="ml-1 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 rounded px-1.5 py-0.5 text-[11px] font-semibold text-slate-800 dark:text-slate-200 focus:outline-none"
+                    title="Customize Notable Importance Threshold"
+                  >
+                    <option value={3}>Levels 3 & 4 (Default)</option>
+                    <option value={4}>Level 4 Only (Milestones)</option>
+                    <option value={2}>Levels 2, 3 & 4</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Color-Coded Importance Legend */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-slate-400 dark:text-slate-500 font-medium mr-1 hidden xl:inline">
+                Importance:
+              </span>
+              {[4, 3, 2, 1].map(lvl => {
+                const info = IMPORTANCE_LEVELS[lvl];
+                const isDimmed = filterMode === 'notable' && lvl < notableThreshold;
+                return (
+                  <span
+                    key={lvl}
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border ${info.bg} ${info.border} ${info.text} transition-opacity ${
+                      isDimmed ? 'opacity-35 line-through' : 'opacity-100'
+                    }`}
+                    title={info.description}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${info.dot}`} />
+                    <span className="font-medium">L{lvl}: {info.shortLabel}</span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================== */}
+      {/* TOOLBAR: CALENDAR CONTROLS & FILTERS       */}
+      {/* ========================================== */}
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-5 pb-3">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+          {/* Left: Period Navigation (Prev / Today / Next + Current Label) */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-0.5">
+              <button
+                onClick={handlePrev}
+                className="p-2 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                title="Previous"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleToday}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition cursor-pointer"
+              >
+                Today
+              </button>
+              <button
+                onClick={handleNext}
+                className="p-2 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                title="Next"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+              {periodStats.periodLabel}
+            </h2>
+          </div>
+
+          {/* Right: View Switcher (Month | Week | Day) + Search & Category Filter */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1 sm:flex-initial sm:w-48">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search wins..."
+                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+
+
+            {/* View Mode Toggle: Month / Week / Day */}
+            <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700">
+              {['month', 'week', 'day'].map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold capitalize transition cursor-pointer ${
+                    viewMode === mode
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================== */}
+      {/* MAIN CONTENT AREA: CALENDAR + SIDEBAR      */}
+      {/* ========================================== */}
+      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-3 flex-1 flex flex-col lg:flex-row gap-6">
+        {/* LEFT / MAIN COLUMN: ACTIVE VIEW (Month, Week, or Day) */}
+        <div className="flex-1 min-w-0">
+          {/* ========================================== */}
+          {/* 1. MONTH VIEW                              */}
+          {/* ========================================== */}
+          {viewMode === 'month' && (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+              {/* Day of Week Header */}
+              <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(dayName => (
+                  <div
+                    key={dayName}
+                    className="py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                  >
+                    {dayName}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar Grid */}
+              <div className="grid grid-cols-7 divide-x divide-y divide-slate-200 dark:divide-slate-800">
+                {getMonthGridDays(selectedDate).map((cell) => {
+                  const dayEntries = entriesByDate[cell.dateStr] || [];
+                  const isToday = cell.dateStr === DEFAULT_TODAY_STR;
+                  const isSelected = cell.dateStr === selectedDate;
+                  const hasMilestone = dayEntries.some(e => e.importance === 4);
+
+                  return (
+                    <div
+                      key={cell.dateStr}
+                      onClick={() => setSelectedDate(cell.dateStr)}
+                      onDoubleClick={() => openNewEntryModal(cell.dateStr)}
+                      className={`min-h-[115px] sm:min-h-[135px] p-1.5 sm:p-2 transition relative group flex flex-col cursor-pointer ${
+                        !cell.isCurrentMonth
+                          ? 'bg-slate-50/60 dark:bg-slate-950/40 text-slate-400 dark:text-slate-600'
+                          : 'bg-white dark:bg-slate-900 hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
+                      } ${
+                        isSelected
+                          ? 'ring-2 ring-inset ring-amber-500 bg-amber-50/20 dark:bg-amber-950/10'
+                          : ''
+                      }`}
+                    >
+                      {/* Top row of cell: Day number + Quick Add button */}
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-1">
+                          <span
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                              isToday
+                                ? 'bg-amber-500 text-white shadow-xs'
+                                : isSelected
+                                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                                : ''
+                            }`}
+                          >
+                            {cell.dayNumber}
+                          </span>
+                          {hasMilestone && (
+                            <Trophy className="w-3.5 h-3.5 text-amber-500 fill-amber-400/30" />
+                          )}
+                        </div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openNewEntryModal(cell.dateStr);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition cursor-pointer"
+                          title={`Log achievement on ${cell.dateStr}`}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Entries List inside Day Cell */}
+                      <div className="space-y-1 flex-1 overflow-y-auto max-h-[92px] pr-0.5">
+                        {dayEntries.map(entry => {
+                          const lvl = IMPORTANCE_LEVELS[entry.importance] || IMPORTANCE_LEVELS[2];
+                          const IconComp = lvl.icon;
+                          return (
+                            <div
+                              key={entry.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDate(cell.dateStr);
+                                setViewingEntry(entry);
+                              }}
+                              className={`px-1.5 py-1 rounded-md text-[11px] font-medium truncate flex items-center gap-1 border ${lvl.bg} ${lvl.border} ${lvl.text} ${lvl.leftBorder} hover:brightness-95 transition shadow-2xs`}
+                              title={`${lvl.shortLabel}: ${entry.title}`}
+                            >
+                              <IconComp className="w-3 h-3 shrink-0" />
+                              <span className="truncate">{entry.title}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================== */}
+          {/* 2. WEEK VIEW                               */}
+          {/* ========================================== */}
+          {viewMode === 'week' && (
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+              {getWeekDays(selectedDate).map((dateStr) => {
+                const d = parseDateStr(dateStr);
+                const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+                const dayNum = d.getDate();
+                const isToday = dateStr === DEFAULT_TODAY_STR;
+                const isSelected = dateStr === selectedDate;
+                const dayEntries = entriesByDate[dateStr] || [];
+
+                return (
+                  <div
+                    key={dateStr}
+                    onClick={() => setSelectedDate(dateStr)}
+                    className={`bg-white dark:bg-slate-900 rounded-2xl border p-3 flex flex-col min-h-[380px] transition cursor-pointer ${
+                      isSelected
+                        ? 'border-amber-500 ring-2 ring-amber-500/20'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    {/* Column Header */}
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
+                      <div>
+                        <div className="text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">
+                          {dayName}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span
+                            className={`text-lg font-bold ${
+                              isToday
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-slate-900 dark:text-white'
+                            }`}
+                          >
+                            {dayNum}
+                          </span>
+                          {isToday && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+                              Today
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openNewEntryModal(dateStr);
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                        title="Add entry"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Entries for this day of the week */}
+                    <div className="space-y-2.5 flex-1">
+                      {dayEntries.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center py-8 text-slate-400 dark:text-slate-600">
+                          <p className="text-xs">No entries</p>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openNewEntryModal(dateStr);
+                            }}
+                            className="mt-2 text-[11px] font-medium text-amber-600 dark:text-amber-400 hover:underline"
+                          >
+                            + Log win
+                          </button>
+                        </div>
+                      ) : (
+                        dayEntries.map(entry => {
+                          const lvl = IMPORTANCE_LEVELS[entry.importance] || IMPORTANCE_LEVELS[2];
+                          const IconComp = lvl.icon;
+                          return (
+                            <div
+                              key={entry.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewingEntry(entry);
+                              }}
+                              className={`p-2.5 rounded-xl border ${lvl.bg} ${lvl.border} ${lvl.leftBorder} shadow-2xs hover:shadow-md transition cursor-pointer`}
+                            >
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${lvl.badge}`}>
+                                  <IconComp className="w-2.5 h-2.5" />
+                                  L{lvl.level}
+                                </span>
+                                {entry.time && (
+                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                    {entry.time}
+                                  </span>
+                                )}
+                              </div>
+                              <h4 className={`text-xs font-bold leading-snug ${lvl.text}`}>
+                                {entry.title}
+                              </h4>
+                              {entry.notes && (
+                                <p className="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-2 mt-1">
+                                  {entry.notes}
+                                </p>
+                              )}
+
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ========================================== */}
+          {/* 3. DAY VIEW                                */}
+          {/* ========================================== */}
+          {viewMode === 'day' && (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs p-5 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 mb-6 border-b border-slate-200 dark:border-slate-800">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                      {formatReadableDate(selectedDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </h3>
+                    {selectedDate === DEFAULT_TODAY_STR && (
+                      <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                        Today
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    {filterMode === 'notable'
+                      ? `Showing Notable Achievements (Importance Level ${notableThreshold}+)`
+                      : 'Showing Detailed View (All logged achievements, progress & daily notes)'}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => openNewEntryModal(selectedDate)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs sm:text-sm shadow-xs transition cursor-pointer self-start"
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>Log Entry for This Day</span>
+                </button>
+              </div>
+
+              {/* Day Entries List */}
+              {(entriesByDate[selectedDate] || []).length === 0 ? (
+                <div className="text-center py-14 px-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-500 flex items-center justify-center mx-auto mb-3">
+                    <Trophy className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">
+                    {filterMode === 'notable'
+                      ? 'No Notable Achievements logged on this day'
+                      : 'Nothing cataloged for this day yet'}
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1 mb-5">
+                    {filterMode === 'notable'
+                      ? 'Switch to "Detailed View" to check if you have standard logs on this day, or log a new milestone now!'
+                      : 'Record a milestone, project progress, workout PR, or daily reflection so you can look back on your journey.'}
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    {filterMode === 'notable' && (
+                      <button
+                        onClick={() => setFilterMode('detailed')}
+                        className="px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                      >
+                        Switch to Detailed View
+                      </button>
+                    )}
+                    <button
+                      onClick={() => openNewEntryModal(selectedDate)}
+                      className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-amber-500 text-white dark:text-slate-950 text-xs font-semibold hover:opacity-90 transition cursor-pointer"
+                    >
+                      + Log Achievement
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {(entriesByDate[selectedDate] || []).map(entry => {
+                    const lvl = IMPORTANCE_LEVELS[entry.importance] || IMPORTANCE_LEVELS[2];
+                    const IconComp = lvl.icon;
+                    return (
+                      <div
+                        key={entry.id}
+                        className={`p-4 sm:p-5 rounded-2xl border ${lvl.bg} ${lvl.border} ${lvl.leftBorder} transition shadow-xs hover:shadow-md`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${lvl.badge}`}>
+                                <IconComp className="w-3.5 h-3.5" />
+                                Level {lvl.level}: {lvl.label}
+                              </span>
+                              {entry.time && (
+                                <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  {entry.time}
+                                </span>
+                              )}
+                            </div>
+
+                            <h4 className={`text-base sm:text-lg font-bold ${lvl.text}`}>
+                              {entry.title}
+                            </h4>
+
+                            {entry.notes && (
+                              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed pt-1 whitespace-pre-line">
+                                {entry.notes}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 self-end sm:self-start shrink-0">
+                            <button
+                              onClick={() => openEditEntryModal(entry)}
+                              className="p-2 rounded-lg bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition cursor-pointer"
+                              title="Edit entry"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(entry.id)}
+                              className="p-2 rounded-lg bg-white/80 dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-rose-600 border border-slate-200/80 dark:border-slate-700 transition cursor-pointer"
+                              title="Delete entry"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ========================================== */}
+        {/* RIGHT SIDEBAR: SELECTED DAY & TROPHY FEED  */}
+        {/* ========================================== */}
+        <aside className="w-full lg:w-80 xl:w-96 shrink-0 space-y-5">
+          {/* Selected Date Inspector Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs p-4 sm:p-5">
+            <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  Selected Day
+                </span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {formatReadableDate(selectedDate, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                </h3>
+              </div>
+              <button
+                onClick={() => openNewEntryModal(selectedDate)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 dark:bg-amber-500 text-white dark:text-slate-950 text-xs font-semibold hover:opacity-90 transition cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add</span>
+              </button>
+            </div>
+
+            {(entriesByDate[selectedDate] || []).length === 0 ? (
+              <div className="py-6 text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {filterMode === 'notable'
+                    ? 'No notable achievements on this date.'
+                    : 'No entries logged for this date.'}
+                </p>
+                <button
+                  onClick={() => openNewEntryModal(selectedDate)}
+                  className="mt-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                >
+                  + Log something memorable
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                {(entriesByDate[selectedDate] || []).map(entry => {
+                  const lvl = IMPORTANCE_LEVELS[entry.importance] || IMPORTANCE_LEVELS[2];
+                  const IconComp = lvl.icon;
+                  return (
+                    <div
+                      key={entry.id}
+                      onClick={() => setViewingEntry(entry)}
+                      className={`p-3 rounded-xl border ${lvl.bg} ${lvl.border} ${lvl.leftBorder} cursor-pointer hover:shadow-xs transition`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${lvl.badge}`}>
+                          <IconComp className="w-3 h-3" />
+                          {lvl.shortLabel}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditEntryModal(entry);
+                            }}
+                            className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                            title="Edit"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirmId(entry.id);
+                            }}
+                            className="p-1 text-slate-500 hover:text-rose-600"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <h4 className={`text-xs font-bold ${lvl.text}`}>{entry.title}</h4>
+                      {entry.notes && (
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-2 mt-1">
+                          {entry.notes}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Period Highlights / Notable Achievements Feed */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Award className="w-4 h-4 text-amber-500" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Period Highlights ({viewMode})
+                </h3>
+              </div>
+              <span className="text-[11px] font-semibold text-slate-400">
+                Top Wins
+              </span>
+            </div>
+
+            <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+              {periodStats.inPeriodEntries
+                .filter(e => (filterMode === 'notable' ? e.importance >= notableThreshold : true))
+                .slice(0, 8)
+                .map(entry => {
+                  const lvl = IMPORTANCE_LEVELS[entry.importance] || IMPORTANCE_LEVELS[2];
+                  const IconComp = lvl.icon;
+                  return (
+                    <div
+                      key={entry.id}
+                      onClick={() => {
+                        setSelectedDate(entry.date);
+                        setViewingEntry(entry);
+                      }}
+                      className="flex items-start gap-2.5 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200 dark:hover:border-slate-800 transition cursor-pointer"
+                    >
+                      <div className={`p-2 rounded-lg shrink-0 ${lvl.badge}`}>
+                        <IconComp className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[10px] font-semibold text-slate-400">
+                            {formatReadableDate(entry.date, { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate mt-0.5">
+                          {entry.title}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {periodStats.inPeriodEntries.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-4">
+                  No achievements logged in this {viewMode} yet.
+                </p>
+              )}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+              <button
+                onClick={() => {
+                  setDataFeedback(null);
+                  setIsDataModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 hover:underline font-semibold cursor-pointer"
+              >
+                <Database className="w-3 h-3" />
+                Export / Import JSON
+              </button>
+
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      {/* ========================================== */}
+      {/* MODAL: DATA BACKUP (JSON EXPORT / IMPORT)  */}
+      {/* ========================================== */}
+      {isDataModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setIsDataModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-xl my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Data & Backup Management
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Auto-saved in browser localStorage ({entries.length} entries currently stored)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsDataModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Status Feedback Banner */}
+            {dataFeedback && (
+              <div
+                className={`mb-4 p-3.5 rounded-xl border flex items-start gap-2.5 text-xs ${
+                  dataFeedback.type === 'error'
+                    ? 'bg-rose-50 dark:bg-rose-950/50 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+                    : 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+                }`}
+              >
+                {dataFeedback.type === 'error' ? (
+                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1 font-medium leading-relaxed">{dataFeedback.message}</div>
+              </div>
+            )}
+
+            <div className="space-y-5">
+              {/* 1. EXPORT SECTION */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <Download className="w-4 h-4 text-amber-500" />
+                      Export Catalog to JSON
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                      Download a portable backup file of all {entries.length} logged achievements and notes to keep safe or move to another device.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleExportJSON}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-400 text-white dark:text-slate-950 text-xs font-bold shadow-xs transition cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export JSON</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. IMPORT SECTION */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-3.5">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Upload className="w-4 h-4 text-emerald-500" />
+                    Import Catalog from JSON
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                    Restore entries from a previously exported <code className="px-1 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-[11px]">.json</code> backup file.
+                  </p>
+                </div>
+
+                {/* Merge vs Replace Radio Toggle */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setImportStrategy('merge')}
+                    className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                      importStrategy === 'merge'
+                        ? 'bg-white dark:bg-slate-900 border-amber-500 ring-2 ring-amber-500/20'
+                        : 'bg-white/50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 opacity-75 hover:opacity-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">
+                        Merge Entries
+                      </span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
+                        Recommended
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                      Keeps current logs, updates matching IDs, and adds new imported entries.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setImportStrategy('replace')}
+                    className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                      importStrategy === 'replace'
+                        ? 'bg-white dark:bg-slate-900 border-rose-500 ring-2 ring-rose-500/20'
+                        : 'bg-white/50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 opacity-75 hover:opacity-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">
+                        Replace All
+                      </span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">
+                        Overwrite
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                      Replaces your entire current catalog with the entries in the uploaded file.
+                    </p>
+                  </button>
+                </div>
+
+                {/* Hidden File Input + Trigger Button */}
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={handleImportFileChange}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-amber-500 dark:hover:border-amber-500 bg-white dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2 transition cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4 text-amber-500" />
+                    <span>
+                      Select .JSON File to {importStrategy === 'merge' ? 'Merge' : 'Replace'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================== */}
+      {/* MODAL: VIEW ENTRY DETAILS                  */}
+      {/* ========================================== */}
+      {viewingEntry && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setViewingEntry(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(() => {
+              const lvl = IMPORTANCE_LEVELS[viewingEntry.importance] || IMPORTANCE_LEVELS[2];
+              const IconComp = lvl.icon;
+              return (
+                <>
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${lvl.badge}`}>
+                      <IconComp className="w-4 h-4" />
+                      Level {lvl.level}: {lvl.label}
+                    </span>
+                    <button
+                      onClick={() => setViewingEntry(null)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white leading-snug">
+                    {viewingEntry.title}
+                  </h3>
+
+                  <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="inline-flex items-center gap-1 font-medium">
+                      <CalendarIcon className="w-3.5 h-3.5" />
+                      {formatReadableDate(viewingEntry.date, { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </span>
+                    {viewingEntry.time && (
+                      <span className="inline-flex items-center gap-1 font-medium">
+                        <Clock className="w-3.5 h-3.5" />
+                        {viewingEntry.time}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className={`mt-5 p-4 rounded-xl border ${lvl.bg} ${lvl.border}`}>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                      Notes & Reflection
+                    </div>
+                    <p className="text-sm text-slate-700 dark:text-slate-200 whitespace-pre-line leading-relaxed">
+                      {viewingEntry.notes || 'No additional notes recorded for this entry.'}
+                    </p>
+                  </div>
+
+                  <div className="mt-6 flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => setDeleteConfirmId(viewingEntry.id)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-rose-200 dark:border-rose-900/60 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-xs font-semibold transition cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => openEditEntryModal(viewingEntry)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 dark:bg-amber-500 text-white dark:text-slate-950 text-xs font-semibold hover:opacity-90 transition cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      Edit Entry
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================== */}
+      {/* MODAL: ADD / EDIT ACHIEVEMENT OR PROGRESS  */}
+      {/* ========================================== */}
+      {isModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-xl my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                  <Trophy className="w-4 h-4" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {editingEntry ? 'Edit Catalog Entry' : 'Log Achievement / Progress'}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEntry} className="space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Achievement or Progress Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="e.g., Shipped v1.0, Hit 100kg Bench PR, Completed Chapter 4..."
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              {/* Importance Level Visual Color Picker (1 - 4) */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Importance Level (Color Coded)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[4, 3, 2, 1].map((lvlNum) => {
+                    const info = IMPORTANCE_LEVELS[lvlNum];
+                    const IconComp = info.icon;
+                    const isSelected = formData.importance === lvlNum;
+                    return (
+                      <button
+                        type="button"
+                        key={lvlNum}
+                        onClick={() => setFormData({ ...formData, importance: lvlNum })}
+                        className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                          info.bg
+                        } ${info.border} ${
+                          isSelected ? `ring-2 ${info.ring} shadow-xs` : 'opacity-75 hover:opacity-100'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${info.badge}`}>
+                          <IconComp className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className={`text-xs font-bold ${info.text}`}>
+                            L{lvlNum}: {info.shortLabel}
+                          </div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
+                            {info.description}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Date, Time & Category Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                    Time (Optional)
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.time}
+                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+              </div>
+
+              {/* Notes / Reflection */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                  Notes & Reflection
+                </label>
+                <textarea
+                  rows={3}
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Add context, metrics, how it felt, or what you learned..."
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-slate-900 dark:bg-amber-500 text-white dark:text-slate-950 text-xs font-semibold hover:opacity-90 transition cursor-pointer shadow-sm"
+                >
+                  {editingEntry ? 'Save Changes' : 'Save to Catalog'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================== */}
+      {/* MODAL: DELETE CONFIRMATION                 */}
+      {/* ========================================== */}
+      {deleteConfirmId && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setDeleteConfirmId(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-5 shadow-xl text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 flex items-center justify-center mx-auto mb-3">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <h4 className="text-base font-bold text-slate-900 dark:text-white">
+              Remove this entry?
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-5">
+              This entry will be permanently removed from your achievement catalog.
+            </p>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteEntry(deleteConfirmId)}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold cursor-pointer"
+              >
+                Delete Entry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
